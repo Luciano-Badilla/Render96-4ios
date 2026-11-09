@@ -1,0 +1,46 @@
+name: Generar Render96-HD.o2r
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_size:
+        description: "Lado máximo de las texturas en píxeles (0 = sin reducir). Recomendado en iPhone: 1024"
+        required: false
+        default: "0"
+  push:
+    paths:
+      - "r96_to_o2r.py"
+      - "data/**"
+      - ".github/workflows/build-o2r.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Descargar el pack Render96 HD
+        run: git clone --depth 1 https://github.com/pokeheadroom/RENDER96-HD-TEXTURE-PACK.git r96pack
+
+      - name: Instalar Pillow (solo si se reduce el tamaño)
+        if: ${{ github.event.inputs.max_size != '' && github.event.inputs.max_size != '0' }}
+        run: python -m pip install Pillow
+
+      - name: Convertir a .o2r
+        run: |
+          python r96_to_o2r.py r96pack -o Render96-HD.o2r \
+            --max-size "${{ github.event.inputs.max_size || '0' }}" \
+            --report informe.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Render96-HD-o2r
+          path: |
+            Render96-HD.o2r
+            informe.json
+          compression-level: 0
+          retention-days: 30

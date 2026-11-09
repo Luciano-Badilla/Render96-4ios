@@ -8,14 +8,20 @@ de Render96 (que siguen los nombres de sm64ex, p. ej.
 que usa Ghostship (`actors/amp/amp_body`) como recursos `RawTexture` (RTEX),
 el formato que Ghostship decodifica como PNG a resolución completa.
 
+Excepción: las texturas que el juego lee a través de tablas (`AssetArray`):
+cielos, HUD, fuentes, menús, fondo del título, medidor de vida, burbujas. Ghostship
+solo reconoce el tipo `Texture` (OTEX) en esas tablas; con otro tipo dibuja basura.
+Esas texturas se guardan como `Texture` v1 con los píxeles RGBA ya decodificados y
+la bandera TEX_FLAG_LOAD_AS_IMG. Para esto hace falta Pillow.
+
 Uso básico:
     python3 r96_to_o2r.py RENDER96-HD-TEXTURE-PACK-master.zip
     python3 r96_to_o2r.py carpeta_del_pack/ -o Render96-HD.o2r
 
-Opcional (requiere Pillow):  --max-size 512  reduce las texturas cuyo lado más
-grande supere ese valor. Útil en iPhone/iPad con poca RAM.
+Opcional:  --max-size 512  reduce las texturas cuyo lado más grande supere ese
+valor. Útil en iPhone/iPad con poca RAM.
 
-Solo usa la biblioteca estándar de Python 3.8+ (Pillow únicamente para --max-size).
+Requiere Python 3.8+ y Pillow  (python3 -m pip install Pillow).
 """
 import argparse
 import io
@@ -32,6 +38,19 @@ DEFAULT_MAP = os.path.join(HERE, "data", "texture_map.json")
 RES_TYPE_RAW_TEXTURE = 0x52544558  # 'RTEX'  (Ghostship: SM64::ResourceType::RawTexture)
 RES_VERSION = 0                    # ResourceFactoryBinaryRawTextureV0
 TEXTYPE_RGBA32 = 1                 # Fast::TextureType::RGBA32bpp
+RES_TYPE_TEXTURE = 0x4F544558      # 'OTEX'  (Fast::ResourceType::Texture)
+TEX_FLAG_LOAD_AS_IMG = 1 << 1
+
+# Texturas que Ghostship usa desde tablas AssetArray (ver AssetArrayFactory.cpp):
+# solo funcionan si el recurso es de tipo Texture (OTEX).
+TABLE_PREFIXES = (
+    "textures/skyboxes/",          # *_skybox_ptrlist
+    "textures/segment2/",          # main_hud_lut, main_font_lut, main_credits_font_lut, main_hud_camera_lut
+    "levels/menu/",                # menu_font_lut, menu_hud_lut
+    "actors/power_meter/",         # power_meter_health_segments_lut
+    "textures/title_screen_bg/",   # mario_title_texture_table, game_over_texture_table
+    "textures/effect/",            # flower_bubbles / lava_bubble / bubble
+)
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
 FORMATS = ("rgba16", "rgba32", "ia1", "ia4", "ia8", "ia16", "i4", "i8", "ci4", "ci8")
@@ -42,15 +61,15 @@ P_EXACT, P_RULE, P_FALLBACK, P_ALIAS = 0, 1, 2, 3
 P_NAMES = {P_EXACT: "exacto", P_RULE: "regla", P_FALLBACK: "tabla", P_ALIAS: "duplicado"}
 
 
-def otr_header():
+def otr_header(res_type=RES_TYPE_RAW_TEXTURE, version=RES_VERSION):
     """Cabecera OTR de 64 bytes, igual a la que escribe Torch (BaseExporter::WriteHeader)."""
     h = struct.pack(
         "<bbbbIIQIQI",
         0,                       # 0x00 endianness: 0 = little
         1,                       # 0x01 asset custom
         0, 0,                    # 0x02-0x03
-        RES_TYPE_RAW_TEXTURE,    # 0x04 tipo de recurso
-        RES_VERSION,             # 0x08 versión
+        res_type,                # 0x04 tipo de recurso
+        version,                 # 0x08 versión
         0xDEADBEEFDEADBEEF,      # 0x0C id
         0,                       # 0x14
         0,                       # 0x18 ROM CRC
@@ -69,6 +88,21 @@ def make_resource(png):
     w, h = png_size(png)
     body = struct.pack("<IIII", TEXTYPE_RGBA32, w, h, len(png))
     return otr_header() + body + png
+
+
+def uses_table(target):
+    return target.startswith(TABLE_PREFIXES)
+
+
+def make_texture_resource(png):
+    """Texture (OTEX) v1 con RGBA32 decodificado, igual a lo que produce RawTextureFactory."""
+    from PIL import Image
+
+    im = Image.open(io.BytesIO(png)).convert("RGBA")
+    pixels = im.tobytes()
+    body = struct.pack("<IIIIffI", TEXTYPE_RGBA32, im.width, im.height, TEX_FLAG_LOAD_AS_IMG,
+                       1.0, 1.0, len(pixels))
+    return otr_header(RES_TYPE_TEXTURE, 1) + body + pixels
 
 
 def shrink(png, max_size):
@@ -192,11 +226,10 @@ def main(argv=None):
     if not chosen:
         sys.exit("No se encontró ninguna textura reconocible en %s. ¿Contiene la carpeta gfx/?" % a.source)
 
-    if a.max_size:
-        try:
-            import PIL  # noqa: F401
-        except ImportError:
-            sys.exit("--max-size requiere Pillow:  python3 -m pip install Pillow")
+    try:
+        import PIL  # noqa: F401
+    except ImportError:
+        sys.exit("Falta Pillow. Instálalo con:  python3 -m pip install Pillow")
 
     manifest = {
         "name": a.name,
@@ -209,19 +242,22 @@ def main(argv=None):
     tmp = a.output + ".tmp"
     counts = {}
     errors = []
-    cache = {}
+    n_table = 0
     with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_STORED) as out:
         out.writestr("manifest.json", json.dumps(manifest, indent=2, ensure_ascii=False))
         for target in sorted(chosen):
             prio, name, reader = chosen[target]
             try:
-                if name not in cache:
-                    png = reader()
-                    if a.max_size:
-                        png = shrink(png, a.max_size)
-                    cache.clear()  # solo se reutiliza la última (destinos consecutivos)
-                    cache[name] = make_resource(png)
-                out.writestr(target, cache[name])
+                png = reader()
+                if a.max_size:
+                    png = shrink(png, a.max_size)
+                if uses_table(target):
+                    # RGBA sin comprimir: se comprime con deflate dentro del .o2r.
+                    out.writestr(target, make_texture_resource(png), compress_type=zipfile.ZIP_DEFLATED,
+                                 compresslevel=6)
+                    n_table += 1
+                else:
+                    out.writestr(target, make_resource(png))
                 counts[prio] = counts.get(prio, 0) + 1
                 if a.verbose:
                     print("  %-10s %s <- %s" % (P_NAMES[prio], target, name))
@@ -232,6 +268,7 @@ def main(argv=None):
     covered = len(chosen)
     print("PNG leídas:            %d" % total)
     print("Texturas en el .o2r:   %d de %d que tiene Ghostship" % (covered - len(errors), len(mapping["textures"])))
+    print("   (%d de cielos/HUD/fuentes/menús guardadas como Texture RGBA)" % n_table)
     for p in sorted(counts):
         print("   - %-10s %d" % (P_NAMES[p], counts[p]))
     if unmatched:

@@ -27,7 +27,7 @@ carga como mod.
 
 ## Opción B: con PC (Windows, macOS o Linux)
 
-Necesitas Python 3.8 o más reciente. No hace falta instalar nada más.
+Necesitas Python 3.8 o más reciente y Pillow (`python3 -m pip install Pillow`).
 
 1. Descarga el pack Render96 HD:
    <https://github.com/pokeheadroom/RENDER96-HD-TEXTURE-PACK> → **Code → Download ZIP**.
@@ -43,7 +43,7 @@ Necesitas Python 3.8 o más reciente. No hace falta instalar nada más.
 Opciones útiles:
 
 ```sh
-# Reducir texturas grandes (necesita:  python3 -m pip install Pillow)
+# Reducir texturas grandes
 python3 r96_to_o2r.py pack.zip --max-size 1024
 
 # Ver qué archivo de Render96 se usó para cada textura de Ghostship
@@ -81,6 +81,13 @@ Para quitarlo, borra el archivo de `mods` o desactívalo en el gestor de mods.
   (`src/port/importer/RawTextureFactory.cpp`) decodifica ese PNG con su resolución
   completa y el renderizador lo escala solo. Por eso las texturas HD se ven en HD y no
   quedan reducidas al tamaño de la N64.
+* Excepción: cielos, HUD, fuentes, menús, fondo del título, medidor de vida y burbujas.
+  El juego no los dibuja por ruta, sino a través de tablas (`AssetArray`), y Ghostship
+  solo acepta recursos de tipo `Texture` en esas tablas
+  (`src/port/importer/AssetArrayFactory.cpp`). Con otro tipo, el juego recibe datos
+  que no entiende y dibuja basura o un cielo negro. Por eso esas texturas se guardan
+  como `Texture` v1 con los píxeles RGBA ya decodificados y la bandera
+  `TEX_FLAG_LOAD_AS_IMG`, comprimidas con deflate dentro del `.o2r`.
 * Los mods de `mods/` se montan después de `sm64.o2r`, así que sus texturas reemplazan
   a las originales.
 

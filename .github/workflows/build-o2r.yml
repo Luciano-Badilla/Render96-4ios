@@ -26,8 +26,7 @@ jobs:
       - name: Descargar el pack Render96 HD
         run: git clone --depth 1 https://github.com/pokeheadroom/RENDER96-HD-TEXTURE-PACK.git r96pack
 
-      - name: Instalar Pillow (solo si se reduce el tamaño)
-        if: ${{ github.event.inputs.max_size != '' && github.event.inputs.max_size != '0' }}
+      - name: Instalar Pillow
         run: python -m pip install Pillow
 
       - name: Convertir a .o2r

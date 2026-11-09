@@ -11,7 +11,7 @@ Render96 a archivos `.o2r` que Ghostship carga como mods.
 | Parte de Render96 | Estado |
 | --- | --- |
 | Texturas HD (niveles, enemigos, HUD, cielos, menús) | ✅ `Render96-HD.o2r`: unas 1700 de las 2217 texturas del juego |
-| Modelos 3D (Mario, enemigos, objetos) | 🧪 `Render96-Models.o2r`: 70 actores, falta probarlo en el juego |
+| Modelos 3D (Mario, enemigos, objetos) | ✅ `Render96-Models.o2r`: 70 actores, probado en iOS |
 | Monedas 3D | ❌ Necesitan `geo_rotate_coin`, una función de render96ex que Ghostship no tiene; quedan las originales |
 | Personajes extra (Luigi, Wario…), controles táctiles propios de Render96 | ❌ Ghostship no tiene esos recursos, así que se ignoran |
 
@@ -51,7 +51,7 @@ python3 r96_to_o2r.py pack.zip --max-size 1024
 python3 r96_to_o2r.py pack.zip -v --report informe.json
 ```
 
-## Modelos 3D (experimental)
+## Modelos 3D
 
 Se generan aparte, en `Render96-Models.o2r`:
 

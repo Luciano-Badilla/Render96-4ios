@@ -17,6 +17,20 @@ Render96 a archivos `.o2r` que Ghostship carga como mods.
 
 ---
 
+## Descarga directa (recomendado)
+
+Los dos mods ya generados están en **[Releases](../../releases/latest)**:
+
+* `Render96-HD.o2r`: texturas HD
+* `Render96-Models.o2r`: modelos 3D
+
+Descárgalos y sigue con [Instalar en iOS](#instalar-en-ios). Las opciones de abajo solo
+hacen falta si quieres generarlos tú, por ejemplo con texturas reducidas (`max_size`) o
+solo algunos modelos (`only`).
+
+Para publicar una versión nueva: *Actions → Publicar release → Run workflow*, con una
+etiqueta nueva (por ejemplo `v1.1`).
+
 ## Opción A: sin PC (GitHub Actions)
 
 1. En este repositorio en GitHub, abre **Actions → Generar Render96-HD.o2r → Run workflow**.
@@ -158,5 +172,6 @@ idénticas y los nombres especiales de sm64ex. No se ejecutan.
 * Ghostship: Harbour Masters: <https://github.com/HarbourMasters/Ghostship>
 * Correspondencias de texturas idénticas: SM64 Reloaded, de GhostlyDark: <https://github.com/GhostlyDark/SM64-Reloaded>
 
-Este repositorio no contiene texturas, ROMs ni otros assets de Nintendo. Necesitas tu
-propia copia de Super Mario 64 para usar Ghostship.
+El código de este repositorio no contiene texturas, ROMs ni otros assets de Nintendo. Las
+releases incluyen las texturas y los modelos de Render96 convertidos al formato de
+Ghostship. Necesitas tu propia copia de Super Mario 64 para usar Ghostship.

@@ -1,0 +1,71 @@
+name: Publicar release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Etiqueta de la versión (p. ej. v1.0)"
+        required: true
+        default: "v1.0"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar Pillow
+        run: python -m pip install Pillow
+
+      - name: Descargar Render96 (texturas y modelos)
+        run: |
+          git clone --depth 1 https://github.com/pokeheadroom/RENDER96-HD-TEXTURE-PACK.git r96pack
+          git clone --depth 1 -b models_vanilla https://github.com/Render96/ModelPack.git modelpack
+          echo "TEX_SHA=$(git -C r96pack rev-parse --short HEAD)" >> "$GITHUB_ENV"
+          echo "MDL_SHA=$(git -C modelpack rev-parse --short HEAD)" >> "$GITHUB_ENV"
+
+      - name: Generar Render96-HD.o2r
+        run: python r96_to_o2r.py r96pack -o Render96-HD.o2r | tee informe.txt
+
+      - name: Generar Render96-Models.o2r
+        run: |
+          python r96_models.py modelpack/Render96/actors -o Render96-Models.o2r | tee -a informe.txt
+          python tools/verify_o2r.py Render96-Models.o2r | tee -a informe.txt
+
+      - name: Crear la release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag }}
+        run: |
+          cat > notas.md <<NOTES
+          Mods de **Render96** para **Ghostship** (iOS, Android, PC y Switch).
+
+          ## Descargas
+          * **Render96-HD.o2r**: texturas HD (niveles, enemigos, HUD, cielos y menús).
+          * **Render96-Models.o2r**: modelos 3D (Mario y unos 70 actores más).
+
+          Puedes usar los dos juntos o solo uno.
+
+          ## Instalar en iPhone / iPad
+          1. Descarga los \`.o2r\` desde esta página (en Safari).
+          2. En la app **Archivos**, muévelos a *En mi iPhone → Ghostship → mods*.
+          3. Cierra Ghostship por completo y vuelve a abrirlo.
+
+          En otras plataformas, copia los archivos a la carpeta \`mods\` de Ghostship.
+
+          ## Origen
+          * Texturas: RENDER96-HD-TEXTURE-PACK @ ${TEX_SHA}
+          * Modelos: Render96/ModelPack (models_vanilla) @ ${MDL_SHA}
+          * Conversión: commit ${GITHUB_SHA::7} de este repositorio
+
+          Necesitas tu propia copia de Super Mario 64 para usar Ghostship.
+          NOTES
+          gh release create "$TAG" Render96-HD.o2r Render96-Models.o2r \
+            --title "Render96 para Ghostship $TAG" --notes-file notas.md --target "$GITHUB_SHA"

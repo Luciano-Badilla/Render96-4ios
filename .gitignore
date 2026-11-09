@@ -2,3 +2,4 @@
 *.o2r.tmp
 __pycache__/
 informe*.json
+informe-modelos.txt

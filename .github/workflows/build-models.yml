@@ -1,0 +1,48 @@
+name: Generar Render96-Models.o2r
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Solo estos actores, separados por comas (vacío = todos). Ej: mario,goomba"
+        required: false
+        default: ""
+  push:
+    paths:
+      - "r96_models.py"
+      - "tools/verify_o2r.py"
+      - "data/ghostship_models.json"
+      - ".github/workflows/build-models.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar Pillow
+        run: python -m pip install Pillow
+
+      - name: Descargar el ModelPack de Render96 (rama models_vanilla)
+        run: git clone --depth 1 -b models_vanilla https://github.com/Render96/ModelPack.git modelpack
+
+      - name: Convertir a .o2r
+        run: |
+          ONLY="${{ github.event.inputs.only }}"
+          python r96_models.py modelpack/Render96/actors -o Render96-Models.o2r ${ONLY:+--only "$ONLY"} | tee informe-modelos.txt
+
+      - name: Verificar el .o2r
+        run: python tools/verify_o2r.py Render96-Models.o2r | tee -a informe-modelos.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Render96-Models-o2r
+          path: |
+            Render96-Models.o2r
+            informe-modelos.txt
+          compression-level: 0
+          retention-days: 30

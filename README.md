@@ -5,13 +5,14 @@ de Harbour Masters que también funciona en iPhone y iPad.
 
 Ghostship no puede leer directamente los archivos de Render96: Render96 se hizo para
 `sm64ex`/`render96ex` y Ghostship usa archivos `.o2r` con otros nombres de recurso.
-Este repositorio convierte el pack **Render96 HD Textures** a un `.o2r` que Ghostship
-carga como mod.
+Este repositorio convierte el pack **Render96 HD Textures** y el **ModelPack** de
+Render96 a archivos `.o2r` que Ghostship carga como mods.
 
 | Parte de Render96 | Estado |
 | --- | --- |
-| Texturas HD (niveles, enemigos, HUD, cielos, menús) | ✅ Funciona: unas 1700 de las 2217 texturas del juego |
-| Modelos 3D HD (Mario, enemigos, etc.) | ❌ Todavía no. Ver [Modelos](#modelos-3d) |
+| Texturas HD (niveles, enemigos, HUD, cielos, menús) | ✅ `Render96-HD.o2r`: unas 1700 de las 2217 texturas del juego |
+| Modelos 3D (Mario, enemigos, objetos) | 🧪 `Render96-Models.o2r`: 70 actores, falta probarlo en el juego |
+| Monedas 3D | ❌ Necesitan `geo_rotate_coin`, una función de render96ex que Ghostship no tiene; quedan las originales |
 | Personajes extra (Luigi, Wario…), controles táctiles propios de Render96 | ❌ Ghostship no tiene esos recursos, así que se ignoran |
 
 ---
@@ -50,12 +51,48 @@ python3 r96_to_o2r.py pack.zip --max-size 1024
 python3 r96_to_o2r.py pack.zip -v --report informe.json
 ```
 
+## Modelos 3D (experimental)
+
+Se generan aparte, en `Render96-Models.o2r`:
+
+* **Sin PC:** *Actions → Generar Render96-Models.o2r → Run workflow*. Para probar solo
+  algunos actores, escribe en `only` algo como `mario` o `mario,goomba,bobomb`. Después
+  descarga el artefacto **Render96-Models-o2r**.
+* **Con PC:**
+
+  ```sh
+  git clone --depth 1 -b models_vanilla https://github.com/Render96/ModelPack.git
+  python3 r96_models.py ModelPack/Render96/actors            # todos los actores
+  python3 r96_models.py ModelPack/Render96/actors --only mario
+  python3 tools/verify_o2r.py Render96-Models.o2r            # comprobación opcional
+  ```
+
+Copia `Render96-Models.o2r` a `mods` junto con `Render96-HD.o2r`. Los dos archivos no
+se pisan entre sí.
+
+Cómo funciona el conversor de modelos:
+
+* Lee el C que exporta fast64 en el ModelPack (`model.inc.c` y `geo.inc.c` de cada actor).
+* Genera los recursos que carga Ghostship:
+  * `DisplayList` en microcódigo F3D. Los triángulos usan `G_TRI2`, que en el modo F3D de
+    Ghostship acepta los 64 vértices que cargan estos modelos.
+  * `Vertex`, `Light` y `Texture` (RGBA, con `TEX_FLAG_LOAD_AS_IMG`).
+  * `GeoLayout` en el formato que lee `src/port/game/GeoLayoutParser.cpp`. Las funciones
+    geo se guardan con su dirección en la ROM US.
+* Si una geo de Render96 tiene el mismo nombre que una de Ghostship (por ejemplo
+  `mario_geo`), se escribe en la misma ruta, por ejemplo `actors/mario/geo/mario_geo`, y
+  reemplaza al modelo original. El resto se guarda bajo `r96/actors/...`.
+* Las animaciones no cambian: los modelos de Render96 usan el mismo esqueleto que los
+  originales.
+* `tools/verify_o2r.py` lee el `.o2r` igual que Ghostship. Comprueba que cada recurso
+  se lea completo y que todas las referencias existan.
+
 ## Instalar en iOS
 
 1. Abre Ghostship una vez (con tu ROM ya convertida) para que cree sus carpetas.
 2. En la app **Archivos**: *En mi iPhone → Ghostship → `mods`*.
    Si no aparece `mods`, créala.
-3. Copia `Render96-HD.o2r` dentro de `mods`.
+3. Copia `Render96-HD.o2r` (y, si quieres, `Render96-Models.o2r`) dentro de `mods`.
 4. Cierra Ghostship por completo y vuelve a abrirlo.
 5. Comprueba que esté activo en **Menú → Mods**. Ghostship marcará el mod como
    *Unsigned*. Es normal en mods hechos por usuarios y no impide que funcione.
@@ -105,15 +142,6 @@ python3 tools/build_texture_map.py --ghostship Ghostship \
 Los scripts de SM64 Reloaded solo se leen como texto, para sacar los grupos de texturas
 idénticas y los nombres especiales de sm64ex. No se ejecutan.
 
-## Modelos 3D
-
-Los modelos HD de Render96 (Render96 Models / render96ex) son código C
-(`model.inc.c`, `geo.inc.c`) que se compila dentro de `render96ex`. Ghostship carga
-los modelos desde `.o2r` como recursos `DisplayList`, `Vertex` y `GeoLayout`, así que
-sí se pueden reemplazar con un mod. Para eso habría que traducir el C de cada modelo a
-esos recursos, o reexportarlo con el *fork* de fast64 de Harbour Masters, que exporta
-para Ghostship. Es el siguiente paso de este proyecto.
-
 ## Problemas comunes
 
 * **No veo cambios**: comprueba que el archivo esté en `mods` y termine en `.o2r`, no en
@@ -126,6 +154,7 @@ para Ghostship. Es el siguiente paso de este proyecto.
 ## Créditos
 
 * Texturas: equipo de Render96 / pokeheadroom: <https://github.com/pokeheadroom/RENDER96-HD-TEXTURE-PACK>
+* Modelos: equipo de Render96: <https://github.com/Render96/ModelPack>
 * Ghostship: Harbour Masters: <https://github.com/HarbourMasters/Ghostship>
 * Correspondencias de texturas idénticas: SM64 Reloaded, de GhostlyDark: <https://github.com/GhostlyDark/SM64-Reloaded>
 
